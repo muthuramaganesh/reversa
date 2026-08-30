@@ -169,11 +169,11 @@ INDEX_HTML = """<!doctype html>
  #out pre{background:#161b22;padding:12px;border-radius:6px;overflow:auto}#out code{font-size:13px}
  #out table{border-collapse:collapse}#out td,#out th{border:1px solid #334155;padding:6px 10px}
  #out a{color:#58a6ff}.empty{color:#8b98a5;margin-top:80px;text-align:center}
- .viewbar{display:flex;gap:16px;align-items:center;margin:0 0 20px;padding:10px 14px;background:#161b22;border:1px solid #263040;border-radius:8px;font-size:13px}
- .viewbar b{color:#e6edf3}
- .viewbar a{color:#58a6ff;cursor:pointer;text-decoration:underline;text-underline-offset:3px;white-space:nowrap}
- .vtag{font-size:11px;color:#8b98a5;margin-left:auto}
- .srcnote{font-size:11px;color:#8b98a5;margin:-6px 0 14px}
+ .tabbar{display:flex;gap:6px;margin:0 0 22px;border-bottom:1px solid #263040}
+ .tabbar button{width:auto;margin:0;padding:9px 18px;font-size:13px;font-weight:600;background:transparent;border:0;border-bottom:2px solid transparent;color:#8b98a5;border-radius:0;cursor:pointer}
+ .tabbar button:hover{color:#e6edf3}
+ .tabbar button.active{color:#e6edf3;border-bottom-color:#2f81f7}
+ .srcnote{font-size:11px;color:#8b98a5;margin:0 0 16px}
 </style></head><body>
 <header><h1>Reversa</h1><span>Reverse documentation engineering — upload a legacy codebase, get a traceable operational specification</span></header>
 <main>
@@ -190,20 +190,19 @@ INDEX_HTML = """<!doctype html>
 <section><div id="out"><p class="empty">The specification will appear here.</p></div></section>
 </main>
 <script>
-const $=id=>document.getElementById(id);let jobId=null;let fullHtml='';let sections=[];
+const $=id=>document.getElementById(id);let jobId=null;let fullHtml='';let sections=[];let tabs=[];let active=0;
 function _top(){const s=document.querySelector('section');if(s)s.scrollTop=0;}
-function bizView(){
-  if(!sections.length){detailView();return;}
-  let h='<div class="viewbar"><b>Business view</b><a onclick="detailView()">Detailed Ops Spec &#8599;</a><span class="vtag">extracted from the code by Reversa</span></div>';
-  sections.forEach(s=>{h+='<h1>'+s.title+'</h1><div class="srcnote">source: '+s.file+'</div>'+s.html;});
-  h+='<div class="viewbar"><a onclick="detailView()">Read the detailed Ops Spec &#8599;</a><span class="vtag">full engineering specification, all sections</span></div>';
-  $('out').innerHTML=h;_top();
+function buildTabs(){
+  tabs=sections.concat([{title:'Detailed Ops Spec',file:'',html:fullHtml}]);
+  active=0;renderTab();
 }
-function detailView(){
-  const back=sections.length?'<a onclick="bizView()">&#8592; Business view</a>':'';
-  $('out').innerHTML='<div class="viewbar"><b>Detailed Ops Spec</b>'+back+'<span class="vtag">full specification</span></div>'+fullHtml;
-  _top();
+function renderTab(){
+  const bar='<div class="tabbar">'+tabs.map((t,i)=>'<button class="'+(i===active?'active':'')+'" onclick="setTab('+i+')">'+t.title+'</button>').join('')+'</div>';
+  const t=tabs[active];
+  const src=t.file?'<div class="srcnote">source: '+t.file+' &middot; extracted from the code by Reversa</div>':'';
+  $('out').innerHTML=bar+src+t.html;_top();
 }
+function setTab(i){active=i;renderTab();}
 $('go').onclick=async()=>{
   const fd=new FormData();const f=$('file').files[0];
   if(f)fd.append('file',f);else if($('repo').value.trim())fd.append('repo_url',$('repo').value.trim());
@@ -215,8 +214,8 @@ $('go').onclick=async()=>{
     const r=await fetch('/analyze/preview',{method:'POST',body:fd});
     if(!r.ok){$('status').textContent='Error: '+(await r.text());return;}
     const j=await r.json();jobId=j.id;fullHtml=j.html;sections=j.sections||[];
-    bizView();$('dl').style.display='block';
-    $('status').textContent='Done — '+j.files+' section(s). '+(sections.length?'Showing the business view; the full engineering spec is behind “Detailed Ops Spec ↗”.':'Scroll to read, or download as Word.');
+    buildTabs();$('dl').style.display='block';
+    $('status').textContent='Done — '+j.files+' section(s). '+(sections.length?'Tabs: Business Context, Process, and the full Detailed Ops Spec.':'Scroll to read, or download as Word.');
   }catch(e){$('status').textContent='Failed: '+e;}finally{$('go').disabled=false;}
 };
 $('dl').onclick=()=>{if(jobId)window.location='/download/'+jobId;};
