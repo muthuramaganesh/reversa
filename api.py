@@ -169,22 +169,13 @@ INDEX_HTML = """<!doctype html>
  #out pre{background:#161b22;padding:12px;border-radius:6px;overflow:auto}#out code{font-size:13px}
  #out table{border-collapse:collapse}#out td,#out th{border:1px solid #334155;padding:6px 10px}
  #out a{color:#58a6ff}.empty{color:#8b98a5;margin-top:80px;text-align:center}
- #ops{display:none;margin-left:auto;color:#58a6ff;font-size:13px;cursor:pointer;text-decoration:underline;text-underline-offset:3px;white-space:nowrap}
- #ovl{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50}
- #panel{position:absolute;top:0;right:0;height:100%;width:min(540px,92vw);background:#0f1419;border-left:1px solid #263040;padding:20px 26px;overflow:auto;box-sizing:border-box}
- #panel h2{margin:0;font-size:16px}
- #pfile{color:#8b98a5;font-size:11px;margin-top:2px}
- .tabs{display:flex;gap:8px;margin:14px 0}
- .tabs button{width:auto;margin:0;padding:6px 14px;font-size:12px;font-weight:500;background:#161b22;border:1px solid #334155;color:#e6edf3;border-radius:6px}
- .tabs button.active{background:#2f81f7;border-color:#2f81f7}
- #pclose{width:auto;margin:0;padding:2px 8px;background:none;border:none;color:#8b98a5;font-size:18px;cursor:pointer}
- #pbody{font-size:13px;line-height:1.65}
- #pbody h1,#pbody h2{font-size:15px;border-bottom:1px solid #263040;padding-bottom:4px}
- #pbody pre{background:#161b22;padding:10px;border-radius:6px;overflow:auto}
- #pbody table{border-collapse:collapse}#pbody td,#pbody th{border:1px solid #334155;padding:5px 8px}
- #pbody a{color:#58a6ff}
+ .viewbar{display:flex;gap:16px;align-items:center;margin:0 0 20px;padding:10px 14px;background:#161b22;border:1px solid #263040;border-radius:8px;font-size:13px}
+ .viewbar b{color:#e6edf3}
+ .viewbar a{color:#58a6ff;cursor:pointer;text-decoration:underline;text-underline-offset:3px;white-space:nowrap}
+ .vtag{font-size:11px;color:#8b98a5;margin-left:auto}
+ .srcnote{font-size:11px;color:#8b98a5;margin:-6px 0 14px}
 </style></head><body>
-<header><h1>Reversa</h1><span>Reverse documentation engineering — upload a legacy codebase, get a traceable operational specification</span><a id="ops" title="Business context &amp; process, extracted from the code">Ops Specs ↗</a></header>
+<header><h1>Reversa</h1><span>Reverse documentation engineering — upload a legacy codebase, get a traceable operational specification</span></header>
 <main>
 <aside>
  <label>Codebase (zip)</label><input type="file" id="file" accept=".zip">
@@ -198,24 +189,21 @@ INDEX_HTML = """<!doctype html>
 </aside>
 <section><div id="out"><p class="empty">The specification will appear here.</p></div></section>
 </main>
-<div id="ovl"><div id="panel">
- <div style="display:flex;justify-content:space-between;align-items:flex-start">
-  <div><h2>Ops Specs</h2><div id="pfile"></div></div>
-  <button id="pclose">✕</button>
- </div>
- <div class="tabs" id="ptabs"></div>
- <div id="pbody"></div>
-</div></div>
 <script>
-const $=id=>document.getElementById(id);let jobId=null;let sections=[];
-function showSection(i){
-  sections.forEach((s,k)=>{const b=$('tab'+k);if(b)b.className=(k===i)?'active':'';});
-  if(sections[i]){$('pbody').innerHTML=sections[i].html;$('pfile').textContent='source: '+sections[i].file;}
+const $=id=>document.getElementById(id);let jobId=null;let fullHtml='';let sections=[];
+function _top(){const s=document.querySelector('section');if(s)s.scrollTop=0;}
+function bizView(){
+  if(!sections.length){detailView();return;}
+  let h='<div class="viewbar"><b>Business view</b><a onclick="detailView()">Detailed Ops Spec &#8599;</a><span class="vtag">extracted from the code by Reversa</span></div>';
+  sections.forEach(s=>{h+='<h1>'+s.title+'</h1><div class="srcnote">source: '+s.file+'</div>'+s.html;});
+  h+='<div class="viewbar"><a onclick="detailView()">Read the detailed Ops Spec &#8599;</a><span class="vtag">full engineering specification, all sections</span></div>';
+  $('out').innerHTML=h;_top();
 }
-$('ops').onclick=()=>{if(!sections.length)return;$('ovl').style.display='block';showSection(0);};
-$('pclose').onclick=()=>{$('ovl').style.display='none';};
-$('ovl').onclick=e=>{if(e.target.id==='ovl')$('ovl').style.display='none';};
-document.addEventListener('keydown',e=>{if(e.key==='Escape')$('ovl').style.display='none';});
+function detailView(){
+  const back=sections.length?'<a onclick="bizView()">&#8592; Business view</a>':'';
+  $('out').innerHTML='<div class="viewbar"><b>Detailed Ops Spec</b>'+back+'<span class="vtag">full specification</span></div>'+fullHtml;
+  _top();
+}
 $('go').onclick=async()=>{
   const fd=new FormData();const f=$('file').files[0];
   if(f)fd.append('file',f);else if($('repo').value.trim())fd.append('repo_url',$('repo').value.trim());
@@ -226,13 +214,9 @@ $('go').onclick=async()=>{
   try{
     const r=await fetch('/analyze/preview',{method:'POST',body:fd});
     if(!r.ok){$('status').textContent='Error: '+(await r.text());return;}
-    const j=await r.json();jobId=j.id;$('out').innerHTML=j.html;$('dl').style.display='block';
-    sections=j.sections||[];
-    if(sections.length){
-      $('ptabs').innerHTML=sections.map((s,i)=>'<button id="tab'+i+'" onclick="showSection('+i+')">'+s.title+'</button>').join('');
-      $('ops').style.display='inline';
-    }
-    $('status').textContent='Done — '+j.files+' section(s). Scroll to read, or download as Word.'+(sections.length?' Business view: click “Ops Specs ↗” top right.':'');
+    const j=await r.json();jobId=j.id;fullHtml=j.html;sections=j.sections||[];
+    bizView();$('dl').style.display='block';
+    $('status').textContent='Done — '+j.files+' section(s). '+(sections.length?'Showing the business view; the full engineering spec is behind “Detailed Ops Spec ↗”.':'Scroll to read, or download as Word.');
   }catch(e){$('status').textContent='Failed: '+e;}finally{$('go').disabled=false;}
 };
 $('dl').onclick=()=>{if(jobId)window.location='/download/'+jobId;};
