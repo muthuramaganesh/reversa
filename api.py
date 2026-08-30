@@ -123,6 +123,58 @@ def _panel_sections(sdd: Path) -> list[dict]:
     return sections
 
 
+BUSINESS_PROMPT = """You are writing for bank business stakeholders (product owners, operations \
+heads, risk managers) who will NOT read code. Below is a specification that was automatically \
+extracted from a codebase.
+
+Write a Business Context overview in plain, readable English with exactly these three short \
+sections (no headings, just three paragraphs):
+1. What the system does — describe the end-to-end behaviour in everyday business language.
+2. Why it matters to the business — revenue, risk, customer/operational impact, as applicable.
+3. What rules the code encodes — summarise the kinds of business rules recovered (limits, \
+cut-offs, retries, reversals, duplicates, exceptions needing a human), and close by saying this \
+document recovers those rules from the code so the business can confirm they are still the rules \
+they want.
+
+Ground every statement in the extracted spec below. Do not invent product names, numbers or \
+rails that are not evidenced. If the spec is thin, stay general rather than fabricating. \
+No code identifiers, no file paths, no bullet IDs. 150-250 words total.
+
+Document title: {title}
+
+Extracted specification:
+{spec}"""
+
+
+def _llm_business_context(md: str, title: str) -> Optional[str]:
+    """Synthesize a plain-English business overview from the extracted spec via the Anthropic API.
+    Returns None (and the UI falls back to extracted files) if no key is set or the call fails."""
+    key = os.getenv("ANTHROPIC_API_KEY")
+    if not key:
+        return None
+    import json
+    import urllib.request
+    body = {
+        "model": os.getenv("REVERSA_LLM_MODEL", "claude-sonnet-4-6"),
+        "max_tokens": 1024,
+        "messages": [{"role": "user",
+                      "content": BUSINESS_PROMPT.format(title=title, spec=md[:48000])}],
+    }
+    req = urllib.request.Request(
+        "https://api.anthropic.com/v1/messages",
+        data=json.dumps(body).encode(),
+        headers={"x-api-key": key, "anthropic-version": "2023-06-01",
+                 "content-type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=120) as r:
+            data = json.loads(r.read())
+        text = "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
+        return text.strip() or None
+    except Exception:
+        return None
+
+
 def _obtain_and_run(work: Path, file_bytes: Optional[bytes], repo_url: Optional[str],
                     backend: str, target: Optional[str]) -> Path:
     """Shared by /analyze and /analyze/preview: get code, run reversa, return _reversa_sdd."""
@@ -252,8 +304,21 @@ async def analyze_preview(
     job = uuid.uuid4().hex
     RESULTS[job] = out
     n_files = len(list(sdd.rglob("*.md")))
+    sections = _panel_sections(sdd)
+    overview = _llm_business_context(md, title)
+    if overview:
+        # Synthesized plain-English overview becomes Business Context;
+        # the raw extracted rules stay available under their own tab.
+        renamed = []
+        for s in sections:
+            if s["title"] == "Business Context":
+                s = {**s, "title": "Domain Rules"}
+            renamed.append(s)
+        sections = [{"title": "Business Context",
+                     "file": "synthesized from the extracted specification",
+                     "html": pypandoc.convert_text(overview, "html", format="gfm")}] + renamed
     return JSONResponse({"id": job, "files": n_files, "html": _to_html(md),
-                         "sections": _panel_sections(sdd)})
+                         "sections": sections})
 
 
 @app.get("/download/{job}")
