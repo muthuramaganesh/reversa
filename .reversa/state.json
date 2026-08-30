@@ -1,0 +1,47 @@
+{
+  "stages": {
+    "reversa-scout": {
+      "status": "done",
+      "seconds": 0.0,
+      "claims": 178
+    },
+    "reversa-archaeologist": {
+      "status": "done",
+      "seconds": 0.0,
+      "claims": 236
+    },
+    "reversa-detective": {
+      "status": "done",
+      "seconds": 0.0,
+      "claims": 478
+    },
+    "reversa-architect": {
+      "status": "done",
+      "seconds": 0.0,
+      "claims": 500
+    },
+    "reversa-process": {
+      "status": "done",
+      "seconds": 0.0,
+      "claims": 506
+    },
+    "reversa-writer": {
+      "status": "done",
+      "seconds": 0.0,
+      "claims": 506
+    },
+    "reversa-reviewer": {
+      "status": "done",
+      "seconds": 0.0,
+      "claims": 506
+    },
+    "reversa-migration": {
+      "status": "done",
+      "seconds": 0.0,
+      "claims": 506
+    }
+  },
+  "backend": "heuristic",
+  "started": 1787702981.8023942,
+  "updated": 1787702981.917449
+}

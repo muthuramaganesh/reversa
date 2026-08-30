@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "reversa"
+version = "0.1.0"
+description = "Reverse documentation engineering: convert legacy software into traceable operational specifications for AI agents (implementation of Macedo & Costa, arXiv:2605.18684)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+reversa = "reversa.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["reversa*"]
+
+[tool.setuptools.package-data]
+reversa = ["templates/*"]

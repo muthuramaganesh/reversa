@@ -1,0 +1,21 @@
+{
+  "version": "0.1.0",
+  "algorithm": "sha256",
+  "files": {
+    ".claude/skills/reversa-archaeologist/SKILL.md": "351e69091cdf07231df08a8f7f1a4a7989be967ac78ecec7903d4aa9a3f276fc",
+    ".claude/skills/reversa-architect/SKILL.md": "0fd12a36f83b913cc009b418ae3c501a599d2cca846ac338d06cec53e77bfe0d",
+    ".claude/skills/reversa-detective/SKILL.md": "c01c96aabe4f41c0186115b5fd783b5680c328b9adb68f55726fdf115a00c794",
+    ".claude/skills/reversa-migration/SKILL.md": "5dc35d3432143fa076d06b1b987198cab183f4f780dc5303a0a416fa0742e1ce",
+    ".claude/skills/reversa-process/SKILL.md": "644028afa35650125f3851a5e494617db19ceca79ca1acdcbc01ec5de013e58e",
+    ".claude/skills/reversa-reviewer/SKILL.md": "efa0e0b780cc412ae66caf0e181df99bfb74d7bbb361392c2ae2089360ba1508",
+    ".claude/skills/reversa-scout/SKILL.md": "ccbfca1b07a500e0838b425eae164f29bf68677337e74ad57a08e8d43696b649",
+    ".claude/skills/reversa-writer/SKILL.md": "e679d25a97f7027bc23c0654808b864da307b2d3cb54251941c8b828a122d4b2",
+    ".reversa/config.toml": "0858072f1098ea940c50b6d87986e336dd23b29b606eb6914423f9876658ddb2",
+    ".reversa/config.user.toml": "79ac018907985970331e937b516ad662e77b9f6e0a4f2a0f50b71d99bdfb9c45",
+    ".reversa/plan.md": "3c30c08cdf325e100c393dbef374e81bb7a40181a89da269eb4ec7d2391dc4f2",
+    ".reversa/templates/gaps.md": "48a456620c641c4c60746c3e6a6e79615ce771f273a75ff8310ba48865a6dd9f",
+    ".reversa/templates/requirements.md": "8b185d4d254ef3780a608a685f49e7e07b3aa7dd7f63b6b61ee94474517db579",
+    ".reversa/version": "e9dd8507f4bf0c6f42458e41aea833ad0bd3f6127272335eee9bf4d58541ed67",
+    "CLAUDE.md": "c45af0c6038c9acb9601cfa2b8d18171cb1bb2cafed768afa27ca60f5b922285"
+  }
+}

@@ -1,0 +1,6 @@
+site_name: Reversa — Operational Specification
+docs_dir: _reversa_sdd
+site_dir: site
+theme:
+  name: material
+  palette: { scheme: slate }

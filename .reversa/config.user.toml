@@ -1,0 +1,3 @@
+# Your overrides. This file is never overwritten by update.
+[migration]
+# target = "go"

@@ -1,0 +1,14 @@
+# Reversa configuration (managed; edit config.user.toml for overrides)
+[project]
+name = "reversa"
+installed = "2026-08-26T08:09:41"
+version = "0.1.0"
+
+[output]
+dir = "_reversa_sdd"
+
+[teams]
+enabled = ["discovery", "migration"]
+
+[engines]
+enabled = ["claude"]
