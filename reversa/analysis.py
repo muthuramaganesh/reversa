@@ -58,6 +58,7 @@ _FIELD = re.compile(r"^\s*(\d\d)\s+([A-Z0-9-]+)(?:\s+PIC(?:TURE)?\s+(?:IS\s+)?([
 _IF = re.compile(r"^\s*IF\s+(.+?)\s*$", re.I)
 _EVAL = re.compile(r"^\s*EVALUATE\s+(.+?)\s*$", re.I)
 _WHEN = re.compile(r"^\s*WHEN\s+(.+?)\s*$", re.I)
+_MOVE = re.compile(r"^\s*MOVE\s+(.+?)\s+TO\s+([A-Z0-9][A-Z0-9-]*)\s*\.?\s*$", re.I)
 _DISPLAY = re.compile(r"\bDISPLAY\s+(.+)", re.I)
 _ACCEPT = re.compile(r"\bACCEPT\s+([A-Z0-9-]+)", re.I)
 _STOP = re.compile(r"\b(STOP\s+RUN|GOBACK|EXIT\s+PROGRAM)\b", re.I)
@@ -156,6 +157,10 @@ def analyze_cobol(path: str, lines: list[str]) -> FileFacts:
             m = _WHEN.match(line)
             if m:
                 ff.facts.append(Fact("case", m.group(1), i, current_para))
+            m = _MOVE.match(line)
+            if m:
+                value, field = m.group(1).strip(), m.group(2).upper()
+                ff.facts.append(Fact("move", field, i, current_para, {"value": value}))
             m = _DISPLAY.search(line)
             if m:
                 s = _STR.search(m.group(1))
@@ -294,6 +299,162 @@ def aborts_in_branch(lines: list[str], cond_line: int) -> bool:
         if depth >= 1 and txt.rstrip().endswith(".") and not _IF_OPEN.match(txt):
             return False
     return False
+
+
+def branch_outcome(lines: list[str], cond_line: int) -> tuple[str, str, str, int] | None:
+    """Find the first determinable outcome at depth 1 inside the IF at
+    `cond_line`, before its matching ELSE/END-IF. Mirrors aborts_in_branch's
+    nesting logic so the result is a structural fact (confirmed), not a fuzzy
+    nearby-line guess. Recognises, in order of precedence: a MOVE (sets a
+    field), an explicit CONTINUE (a deliberate no-op -- not a gap), or a
+    DISPLAY of a likely error message. Returns (kind, detail1, detail2, line)
+    with kind "move" (field, value) | "continue" ("","") | "message" (text,""),
+    or None if no such outcome could be found before the branch closes.
+    This replaces proximity-based ("message within N lines") guessing: only
+    a message that is structurally INSIDE this branch is ever paired with it."""
+    depth = 0
+    for ln in range(cond_line, min(len(lines), cond_line + 60)):
+        txt = lines[ln] if ln < len(lines) else ""
+        if _IF_OPEN.match(txt):
+            depth += 1
+            continue
+        if depth == 1 and re.match(r"^\s*ELSE\b", txt, re.I):
+            return None
+        if depth == 1:
+            m = _MOVE.match(txt)
+            if m:
+                return ("move", m.group(2).upper(), m.group(1).strip(), ln + 1)
+            if re.match(r"^\s*CONTINUE\s*\.?\s*$", txt, re.I):
+                return ("continue", "", "", ln + 1)
+            m = _DISPLAY.search(txt)
+            if m:
+                s = _STR.search(m.group(1))
+                text = (s.group(1) if s else m.group(1)).strip()
+                if ERROR_WORDS.search(text):
+                    return ("message", text, "", ln + 1)
+        if _IF_CLOSE.match(txt):
+            depth -= 1
+            if depth <= 0:
+                return None
+        if depth >= 1 and txt.rstrip().endswith(".") and not _IF_OPEN.match(txt):
+            return None
+    return None
+
+
+_END_EVAL = re.compile(r"^\s*END-EVALUATE\b", re.I)
+
+
+def case_outcome(lines: list[str], case_line: int, end_line: int) -> tuple[str, str, int] | None:
+    """Find the first MOVE inside a WHEN case body, bounded by end_line (the
+    next WHEN at the same level, or the enclosing END-EVALUATE) -- NOT by
+    IF/END-IF, which a WHEN body has no relation to. Using branch_outcome's
+    IF-nesting logic here would scan straight past END-EVALUATE into
+    whatever IF happens to follow, attributing an unrelated MOVE to this
+    case; that bug is exactly why this separate, EVALUATE-aware scan exists.
+    Returns (field, value, line) or None."""
+    for ln in range(case_line, min(len(lines), max(case_line, end_line - 1))):
+        txt = lines[ln] if ln < len(lines) else ""
+        m = _MOVE.match(txt)
+        if m:
+            return (m.group(2).upper(), m.group(1).strip(), ln + 1)
+    return None
+
+
+# --------------------------------------------------------------------------
+# Plain-English rendering of conditions and EVALUATE cases, for BA-readable
+# rules. These functions only reword syntax already present in the code --
+# they never infer or invent meaning. If a pattern isn't recognised, the
+# input is returned lightly cleaned rather than mistranslated.
+# --------------------------------------------------------------------------
+
+_QUOTED = re.compile(r"^'([^']*)'$|^\"([^\"]*)\"$")
+_COBOL_ZERO = {"ZERO", "ZEROS", "ZEROES"}
+_COBOL_SPACE = {"SPACE", "SPACES"}
+
+_FIELD_WORDS = {
+    "AMT": "amount", "AMOUNT": "amount", "PCT": "percentage", "PERCENT": "percentage",
+    "CCY": "currency", "CURRENCY": "currency", "RATE": "rate", "FEE": "fee",
+    "STATUS": "status", "CARD": "card", "BANK": "bank", "WALLET": "wallet",
+    "CH": "channel", "PAY": "payment", "WS": "", "LK": "", "LS": "", "WK": "", "W": "", "DT": "date", "NO": "number",
+    "QTY": "quantity", "BAL": "balance", "ACCT": "account", "CUST": "customer",
+    "FLG": "flag", "FLAG": "flag", "CODE": "code", "NAME": "name", "LMT": "limit",
+    "MIN": "minimum", "MAX": "maximum", "TOT": "total", "NUM": "number",
+}
+
+_OP_WORDS = {
+    "=": "is", "==": "is", "NOT =": "is not", "!=": "is not",
+    ">": "is greater than", ">=": "is at least",
+    "<": "is less than", "<=": "is at most",
+}
+
+_SIMPLE_CMP = re.compile(r"^\s*([A-Z0-9][A-Z0-9-]*)\s*(NOT\s*=|>=|<=|=|>|<)\s*(.+?)\s*$", re.I)
+
+
+def field_english(name: str) -> str:
+    """COBOL identifier (e.g. WS-FEE-PCT, PAY-AMT) -> business phrase."""
+    parts = [p for p in name.upper().split("-") if p]
+    words = [_FIELD_WORDS.get(p, p.lower()) for p in parts]
+    words = [w for w in words if w]
+    return " ".join(words) or name.lower()
+
+
+def value_english(v: str) -> str:
+    v = v.strip()
+    m = _QUOTED.match(v)
+    if m:
+        return f'"{m.group(1) or m.group(2)}"'
+    if v.upper() in _COBOL_ZERO:
+        return "zero"
+    if v.upper() in _COBOL_SPACE:
+        return "blank"
+    return v
+
+
+def _one_comparison_english(clause: str) -> str | None:
+    m = _SIMPLE_CMP.match(clause.strip())
+    if not m:
+        return None
+    field, op, value = m.group(1), " ".join(m.group(2).upper().split()), m.group(3)
+    return f"the {field_english(field)} {_OP_WORDS.get(op, op)} {value_english(value)}"
+
+
+def condition_english(text: str) -> str:
+    """Best-effort plain-English rendering of a COBOL IF/WHEN condition."""
+    t = text.strip().rstrip(".")
+    negate_all = False
+    inner = t
+    m = re.match(r"^NOT\s*\((.+)\)\s*$", t, re.I)
+    if m:
+        negate_all, inner = True, m.group(1)
+    parts = re.split(r"\s+(AND|OR)\s+", inner, flags=re.I)
+    if len(parts) >= 3 and len(parts) % 2 == 1:
+        clauses, joiners = parts[0::2], [j.upper() for j in parts[1::2]]
+        rendered = [_one_comparison_english(c) or c.strip() for c in clauses]
+        if all(j == joiners[0] for j in joiners):
+            sentence = f" {'and' if joiners[0] == 'AND' else 'or'} ".join(rendered)
+        else:
+            sentence = ", ".join(rendered)
+    else:
+        one = _one_comparison_english(inner)
+        if one:
+            sentence = one
+        elif re.match(r"^[A-Z0-9][A-Z0-9-]*(\s+OR\s+[A-Z0-9][A-Z0-9-]*)+$", inner, re.I):
+            flags = re.split(r"\s+OR\s+", inner, flags=re.I)
+            sentence = "the payment channel is " + " or ".join(field_english(f) for f in flags)
+        else:
+            sentence = inner.lower()
+    return f"none of the following holds: {sentence}" if negate_all else sentence
+
+
+def case_value_english(case_name: str) -> str:
+    """A WHEN's matched value/flag (e.g. CH-CARD, 'SGD') -> business phrase."""
+    v = case_name.strip()
+    m = _QUOTED.match(v)
+    if m:
+        return value_english(v)
+    if re.match(r"^[A-Z0-9][A-Z0-9-]*$", v, re.I):
+        return field_english(v)
+    return condition_english(v)
 
 
 def excerpt(lines: list[str], line: int, n: int = 1) -> str:

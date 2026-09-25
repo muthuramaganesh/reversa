@@ -35,7 +35,7 @@ def test_discovery_and_migration_offline(atm: Path):
             assert c.evidence, c.id
             assert any(verify_evidence(atm, e)[0] for e in c.evidence), c.id
     # interpretation stays inferred
-    assert any(c.confidence == Confidence.INFERRED and "rejected with message" in c.statement
+    assert any(c.confidence == Confidence.INFERRED and "based on the message" in c.statement
                for c in reg.claims)
     # requirements cite claims that exist
     ids = {c.id for c in reg.claims}

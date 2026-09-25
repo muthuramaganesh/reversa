@@ -33,8 +33,8 @@ MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "50"))
 RUN_TIMEOUT_S = int(os.getenv("RUN_TIMEOUT_S", "900"))          # 15 min ceiling for reversa run
 SDD_DIR = "_reversa_sdd"
 # Preferred reading order for the Word doc; anything else follows alphabetically.
-ORDER = ["README.md", "inventory.md", "rules.md", "architecture.md", "process.md",
-         "migration.md", "risks.md", "gaps.md", "questions.md"]
+ORDER = ["README.md", "ops_spec.md", "rules.md", "gaps_contradictions.md", "processes.md", "process.md",
+         "inventory.md", "architecture.md", "migration.md", "risks.md", "gaps.md", "questions.md"]
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -101,8 +101,10 @@ RESULTS: dict[str, Path] = {}          # job id → docx path (ephemeral; fine f
 # Docs surfaced in the side panel for business readers: (tab title, candidate files
 # in priority order — first match under _reversa_sdd wins).
 PANEL_FILES = [
-    ("Business Context", ["business_context.md", "context.md", "rules.md", "README.md"]),
-    ("Process", ["process.md"]),
+    ("Domain Rules", ["rules.md"]),
+    ("Process", ["processes.md", "process.md"]),
+    ("Gaps & Contradictions", ["gaps_contradictions.md"]),
+    ("Detailed Ops Spec", ["ops_spec.md"]),
 ]
 
 
@@ -245,7 +247,7 @@ INDEX_HTML = """<!doctype html>
 const $=id=>document.getElementById(id);let jobId=null;let fullHtml='';let sections=[];let tabs=[];let active=0;
 function _top(){const s=document.querySelector('section');if(s)s.scrollTop=0;}
 function buildTabs(){
-  tabs=sections.concat([{title:'Detailed Ops Spec',file:'',html:fullHtml}]);
+  tabs=sections.concat([{title:'Full Document',file:'',html:fullHtml}]);
   active=0;renderTab();
 }
 function renderTab(){
@@ -267,7 +269,7 @@ $('go').onclick=async()=>{
     if(!r.ok){$('status').textContent='Error: '+(await r.text());return;}
     const j=await r.json();jobId=j.id;fullHtml=j.html;sections=j.sections||[];
     buildTabs();$('dl').style.display='block';
-    $('status').textContent='Done — '+j.files+' section(s). '+(sections.length?'Tabs: Business Context, Process, and the full Detailed Ops Spec.':'Scroll to read, or download as Word.');
+    $('status').textContent='Done — '+j.files+' section(s). '+(sections.length?'Tabs: '+sections.map(x=>x.title).join(', ')+', and the Full Document.':'Scroll to read, or download as Word.');
   }catch(e){$('status').textContent='Failed: '+e;}finally{$('go').disabled=false;}
 };
 $('dl').onclick=()=>{if(jobId)window.location='/download/'+jobId;};
@@ -307,16 +309,11 @@ async def analyze_preview(
     sections = _panel_sections(sdd)
     overview = _llm_business_context(md, title)
     if overview:
-        # Synthesized plain-English overview becomes Business Context;
-        # the raw extracted rules stay available under their own tab.
-        renamed = []
-        for s in sections:
-            if s["title"] == "Business Context":
-                s = {**s, "title": "Domain Rules"}
-            renamed.append(s)
+        # Synthesized plain-English overview leads; rules, gaps and the layered
+        # ops spec follow as their own tabs.
         sections = [{"title": "Business Context",
                      "file": "synthesized from the extracted specification",
-                     "html": pypandoc.convert_text(overview, "html", format="gfm")}] + renamed
+                     "html": pypandoc.convert_text(overview, "html", format="gfm")}] + sections
     return JSONResponse({"id": job, "files": n_files, "html": _to_html(md),
                          "sections": sections})
 
