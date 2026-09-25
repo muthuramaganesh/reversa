@@ -1119,6 +1119,72 @@ def _table_output(t: Table, sp: Spec) -> str:
 
 
 # --------------------------------------------------------------------------
+# Optional AI rewriting pass (used only when an AI backend is configured)
+# --------------------------------------------------------------------------
+REWRITE_PROMPT = ("Rewrite the rules as a single sentence a non-technical business analyst would "
+                  "understand. State the condition and the outcome in business terms (not variable "
+                  "names). Then give one worked numeric example. Do not use code syntax.")
+
+REWRITE_SYSTEM = (REWRITE_PROMPT + "\n\nYou will receive a JSON list of rules, each with an id, the "
+                  "code it came from, and a draft sentence. Keep every number, limit, rate, "
+                  "currency and message text exactly as given. Do not add facts that are not in the "
+                  "code. Reply with JSON only: {\"rules\": [{\"id\": \"BR-01\", \"rule\": \"...\", "
+                  "\"example\": \"...\"}]}")
+
+
+def _must_keep(r: Rule) -> list[str]:
+    """Literals from the code that a rewrite must preserve (numbers and quoted values)."""
+    src = r.technical + " " + r.plain
+    keep = [q.strip() for q in re.findall(r"'([^']+)'", r.technical)]
+    for n in re.findall(r"(?<![\w.])(\d+(?:\.\d+)?)(?![\w.])", r.technical):
+        if n not in ("0", "1"):
+            keep.append(n)
+    return keep
+
+
+def _survives(literal: str, text: str) -> bool:
+    if literal.lower() in text.lower():
+        return True
+    n = _num(literal)
+    if n is None:
+        return False
+    variants = {literal, f"{n:,.2f}", f"{n:,.0f}" if n == int(n) else literal, f"{n:g}",
+                f"{n * 100:.2f}%", f"{n * 100:g}%"}
+    return any(v in text for v in variants)
+
+
+def rewrite_rules(spec: Spec, call) -> int:
+    """Rewrite each rule with REWRITE_PROMPT via call(system, user) -> str.
+    A rewrite is accepted only if every literal from the code survives it; otherwise the
+    deterministic wording is kept. Returns the number of rules rewritten."""
+    import json
+    from .llm.base import strip_json as parse_json
+    rules = [r for r in spec.rules]
+    if not rules:
+        return 0
+    payload = [{"id": r.id, "type": r.category, "code": r.technical,
+                "draft": r.plain, "draft_example": r.example} for r in rules]
+    try:
+        reply = call(REWRITE_SYSTEM, json.dumps({"program": spec.program.name, "rules": payload}))
+        data = parse_json(reply)
+    except Exception:
+        return 0
+    by_id = {x.get("id"): x for x in (data or {}).get("rules", []) if isinstance(x, dict)}
+    done = 0
+    for r in rules:
+        new = by_id.get(r.id)
+        if not new or not new.get("rule"):
+            continue
+        text = f"{new.get('rule', '')} {new.get('example', '')}"
+        if all(_survives(k, text) for k in _must_keep(r)):
+            r.note = (r.note + " " if r.note else "") + f"Original wording: {r.plain}"
+            r.plain = new["rule"].strip()
+            r.example = (new.get("example") or r.example).strip()
+            done += 1
+    return done
+
+
+# --------------------------------------------------------------------------
 # Claims for the Reversa registry (so scoring/reviewer keep working)
 # --------------------------------------------------------------------------
 def to_claims(sp: Spec) -> list[dict[str, Any]]:

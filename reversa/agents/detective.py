@@ -208,6 +208,11 @@ class Detective(Agent):
             # deterministic structural spec for COBOL, independent of the backend
             self._specs[u.name] = [specbuilder.build(p, proj.lines(p)) for p in u.files
                                    if facts[p].language == "cobol"]
+            call = getattr(ctx.backend, "_call", None)
+            if callable(call):   # AI backend configured: apply the plain-English rewriting prompt
+                for sp in self._specs[u.name]:
+                    n = specbuilder.rewrite_rules(sp, call)
+                    ctx.log(f"  detective: {u.name}: {n}/{len(sp.rules)} rules rewritten in plain English")
             payload = {"unit": u.name, "sources": {p: proj.numbered(p) for p in u.files},
                        "facts": facts, "lines": {p: proj.lines(p) for p in u.files},
                        "technical_claims": [c.statement for c in reg.claims_for(u.name)]}
