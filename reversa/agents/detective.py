@@ -239,6 +239,24 @@ class Detective(Agent):
         if specs:
             ctx.write("ops_spec.md", specbuilder.render_ops_spec(specs))
             ctx.write("gaps_contradictions.md", specbuilder.render_gaps(specs))
+<<<<<<< HEAD
+=======
+            ctx.write("process_flow.md", specbuilder.render_process(specs))
+            import json as _json, os as _os
+            rules_json = specbuilder.to_json(specs)
+            ctx.write("rules.json", _json.dumps(rules_json, indent=2, default=str))
+            std_path = _os.environ.get("REVERSA_STANDARDS")
+            if std_path and _os.path.exists(std_path):
+                from .. import standards as _std
+                try:
+                    cmp = _std.compare(rules_json, _std.load_standard(std_path))
+                    ctx.write("comparison.json", _json.dumps(cmp, indent=2, default=str))
+                    ctx.write("comparison.md", _std.render_md(cmp))
+                    _std.write_xlsx(cmp, ctx.out_dir / "comparison.xlsx")
+                    ctx.log(f"  detective: standards comparison: {cmp['summary']}")
+                except Exception as e:      # never fail the run because of the standards file
+                    ctx.log(f"  detective: standards comparison skipped: {e}")
+>>>>>>> 5f57dba (Reversa: hybrid backend, formatted Word export, analysis-mode docs)
         parts = [specbuilder.render_rules(specs)] if specs else ["# Domain rules, states and exceptions\n"]
         spec_units = {u for u, sps in getattr(self, "_specs", {}).items() if sps}
         for u in ctx.selected_units():

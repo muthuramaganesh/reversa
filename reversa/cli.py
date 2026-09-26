@@ -5,10 +5,11 @@
     reversa status
     reversa uninstall [--purge]
     reversa add-engine <key>
-    reversa run       [--backend auto|anthropic|heuristic] [--resume] [--only scout,reviewer] [--units A,B]
+    reversa run       [--backend auto|anthropic|heuristic|qwen|hybrid-qwen|hybrid-anthropic] [--resume] [--only scout,reviewer] [--units A,B]
     reversa migrate   --target go [--backend ...]
     reversa answer    <Q-001|GAP-002> "<text>"     # feed human decisions back
     reversa export-diagrams                          # architecture graph as .mmd
+    reversa export-docx [--title ..] [--file x.docx] # formatted Word document of the artifacts
     reversa report                                   # print confidence snapshot
 """
 from __future__ import annotations
@@ -78,13 +79,17 @@ def cmd_add_engine(args):
 
 
 def cmd_run(args):
-    o = Orchestrator(_root(args), _backend(args), out_dir=args.out,
+    b = _backend(args)
+    o = Orchestrator(_root(args), b, out_dir=args.out,
                      config={"target": args.target} if getattr(args, "target", None) else {})
     team = "all" if getattr(args, "target", None) else "discovery"
     o.run(team=team, resume=args.resume,
           only=args.only.split(",") if args.only else None,
           units=args.units.split(",") if args.units else None)
     d = distribution(o.registry.claims)
+    if getattr(b, "llm_calls", 0):
+        print(f"{b.name}: {b.llm_calls - b.llm_failures}/{b.llm_calls} LLM rewrite calls succeeded"
+              + (" (failed ones kept heuristic wording)" if b.llm_failures else ""))
     print(f"\nartifacts: {o.out_dir}")
     print(f"claims {d.total}: {d.confirmed} confirmed / {d.inferred} inferred / {d.gap} gap · "
           f"index {d.index:.1%} · gaps {len(o.registry.gaps)} · questions {len(o.registry.questions)}")
@@ -139,6 +144,18 @@ def cmd_export(args):
     print(f"wrote {out / 'architecture.mmd'}")
 
 
+def cmd_export_docx(args):
+    from .docx_export import build_docx
+    root = _root(args)
+    sdd = root / args.out
+    if not sdd.is_dir():
+        print(f"error: no artifacts at {sdd}; run `reversa run` first", file=sys.stderr)
+        sys.exit(1)
+    out = Path(args.file) if args.file else sdd / "reversa_spec.docx"
+    build_docx(sdd, out, title=args.title, paginate="off" if args.no_page_numbers else None)
+    print(f"wrote {out}")
+
+
 def cmd_report(args):
     root = _root(args)
     reg = Registry.load(root / STATE_DIR / "registry.json")
@@ -160,8 +177,11 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument("--out", default=DEFAULT_OUT, help="artifact directory (default: _reversa_sdd)")
 
     def backend(sp):
-        sp.add_argument("--backend", default="auto", choices=["auto", "anthropic", "heuristic"])
-        sp.add_argument("--model", default=None, help="model id for the anthropic backend")
+        sp.add_argument("--backend", default="auto", choices=["auto", "anthropic", "heuristic", "qwen",
+                                                         "hybrid-qwen", "hybrid-anthropic"],
+                        help="hybrid-*: heuristic extraction, LLM only for the plain-English rewrite")
+        sp.add_argument("--model", default=None,
+                        help="model id for the anthropic, qwen or hybrid-* backend")
 
     s = sub.add_parser("install", help="install Reversa into a legacy project"); common(s)
     s.add_argument("--engines", help="comma list: claude,codex,cursor,gemini,... (default: detect)")
@@ -196,6 +216,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--status", choices=["resolved", "residual", "out_of_scope"]); s.set_defaults(fn=cmd_answer)
 
     s = sub.add_parser("export-diagrams", help="export architecture graph as Mermaid"); common(s); s.set_defaults(fn=cmd_export)
+    s = sub.add_parser("export-docx", help="write the artifacts as one formatted Word document"); common(s)
+    s.add_argument("--title", default="Operational Specification")
+    s.add_argument("--file", help="output path (default: <out>/reversa_spec.docx)")
+    s.add_argument("--no-page-numbers", action="store_true",
+                   help="skip the LibreOffice pass that pre-fills Contents page numbers")
+    s.set_defaults(fn=cmd_export_docx)
     s = sub.add_parser("report", help="print confidence snapshot as JSON"); common(s); s.set_defaults(fn=cmd_report)
     return p
 

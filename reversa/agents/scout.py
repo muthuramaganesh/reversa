@@ -100,6 +100,14 @@ class Scout(Agent):
             "lines": {f.path: proj.lines(f.path) for f in code},
         }
         out = ctx.backend.generate(self, payload)
+        # A model that returns no usable units (common with small local models) would leave
+        # every later agent with nothing to analyse. Fall back to deterministic grouping.
+        if not any(isinstance(u, dict) and u.get("name") and u.get("files") for u in out.get("units", []) or []):
+            fallback = self.heuristic(payload)
+            out["units"] = fallback.get("units", [])
+            out.setdefault("stack", fallback.get("stack"))
+            out.setdefault("_warnings", []).append(
+                f"{self.name}: model returned no units; used file-based grouping instead")
         self.record_warnings(ctx, out)
         reg.meta["stack"] = out.get("stack", [])
         reg.units = []

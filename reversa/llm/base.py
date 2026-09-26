@@ -35,6 +35,13 @@ def get_backend(name: str, **kw: Any) -> Backend:
     if name == "anthropic":
         from .anthropic_backend import AnthropicBackend
         return AnthropicBackend(**kw)
+    if name == "qwen":
+        from .qwen_backend import QwenBackend
+        return QwenBackend(**kw)
+    if name in ("hybrid-qwen", "hybrid-anthropic"):
+        # heuristic extraction; Qwen/Anthropic only for the plain-English rewrite
+        from .hybrid_backend import HybridBackend
+        return HybridBackend(llm=name.split("-", 1)[1], **kw)
     if name == "auto":
         import os
         if os.environ.get("ANTHROPIC_API_KEY"):
