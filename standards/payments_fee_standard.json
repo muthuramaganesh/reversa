@@ -1,0 +1,86 @@
+{
+  "standard": "Group Payments Fee Processing Standard",
+  "version": "2.1",
+  "owner": "Transaction Banking - Payments Product",
+  "effective_date": "2026-01-01",
+  "notes": "Sample standard for comparison with extracted code rules. Field names are matched by keyword (e.g. AMT matches PAY-AMT).",
+  "rules": [
+    {"id": "STD-01", "category": "Validation", "type": "condition",
+     "name": "Reject zero-amount payments",
+     "description": "A payment with an amount of zero must be rejected with the reason ZERO AMOUNT.",
+     "when": {"field": ["AMT", "AMOUNT"], "op": "=", "value": 0},
+     "then": [{"set": ["STATUS"], "value": "REJECTED"}, {"set": ["REASON"], "value": "ZERO AMOUNT"}]},
+
+    {"id": "STD-02", "category": "Validation", "type": "condition",
+     "name": "Maximum single payment",
+     "description": "Payments above 500,000.00 must be rejected with the reason OVER LIMIT.",
+     "when": {"field": ["AMT", "AMOUNT"], "op": ">", "value": 500000},
+     "then": [{"set": ["STATUS"], "value": "REJECTED"}]},
+
+    {"id": "STD-03", "category": "Validation", "type": "condition",
+     "name": "Approved payment channels",
+     "description": "A payment must arrive through an approved channel: card, bank transfer or wallet.",
+     "when": {"field": ["CH", "CHANNEL"], "op": "none_of", "value": ["CARD", "BANK", "WALLET"]},
+     "then": [{"set": ["STATUS"], "value": "REJECTED"}]},
+
+    {"id": "STD-04", "category": "Validation", "type": "condition",
+     "name": "Supported currencies",
+     "description": "Only SGD, USD, THB and MYR payments may be processed; all others are rejected.",
+     "when": {"field": ["CCY", "CURRENCY"], "op": "not_in", "value": ["SGD", "USD", "THB", "MYR"]},
+     "then": [{"set": ["STATUS"], "value": "REJECTED"}]},
+
+    {"id": "STD-05", "category": "Pricing", "type": "lookup",
+     "name": "Card fee rate",
+     "description": "Card payments are charged 2.90% of the payment amount.",
+     "table": {"field": ["CH", "CHANNEL"]}, "key": "CARD", "sets": ["PCT"], "value": 0.029},
+
+    {"id": "STD-06", "category": "Pricing", "type": "lookup",
+     "name": "Wallet fee rate",
+     "description": "Wallet payments are charged 1.50% of the payment amount.",
+     "table": {"field": ["CH", "CHANNEL"]}, "key": "WALLET", "sets": ["PCT"], "value": 0.015},
+
+    {"id": "STD-07", "category": "Pricing", "type": "lookup",
+     "name": "Bank transfer fee rate",
+     "description": "Bank transfers are charged 0.40% of the payment amount.",
+     "table": {"field": ["CH", "CHANNEL"]}, "key": "BANK", "sets": ["PCT"], "value": 0.004},
+
+    {"id": "STD-08", "category": "Pricing", "type": "condition",
+     "name": "Volume discount",
+     "description": "For payments above 10,000.00 the fee rate is reduced by 20% (multiplied by 0.8).",
+     "when": {"field": ["AMT", "AMOUNT"], "op": ">", "value": 10000},
+     "then": [{"calculate": ["PCT"], "factor": 0.8}]},
+
+    {"id": "STD-09", "category": "Pricing", "type": "calculation",
+     "name": "Fee calculation",
+     "description": "The fee is the payment amount multiplied by the fee rate.",
+     "target": ["FEE", "AMT"], "uses": [["AMT"], ["PCT"]]},
+
+    {"id": "STD-10", "category": "Pricing", "type": "condition",
+     "name": "Minimum fee",
+     "description": "Every accepted payment is charged at least 1.00 in fees.",
+     "when": {"field": ["FEE"], "op": "<", "value": 1.00},
+     "then": [{"set": ["FEE"], "value": 1.00}]},
+
+    {"id": "STD-11", "category": "Control", "type": "default_case",
+     "name": "Unknown channel handling",
+     "description": "The fee table must reject or default any channel value it does not recognise.",
+     "table": {"field": ["CH", "CHANNEL"]}},
+
+    {"id": "STD-12", "category": "Control", "type": "condition",
+     "name": "Duplicate payment check",
+     "description": "A payment already processed in the same batch must be rejected as a duplicate.",
+     "when": {"field": ["DUP", "DUPLICATE"], "op": "=", "value": "Y"},
+     "then": [{"set": ["STATUS"], "value": "REJECTED"}]},
+
+    {"id": "STD-13", "category": "Control", "type": "condition",
+     "name": "Sanctions screening hold",
+     "description": "A payment flagged by sanctions screening must be held and not processed.",
+     "when": {"field": ["SANCTION", "SCREEN"], "op": "=", "value": "Y"},
+     "then": [{"set": ["STATUS"], "value": "HELD"}]},
+
+    {"id": "STD-14", "category": "Pricing", "type": "calculation",
+     "name": "Conversion to SGD",
+     "description": "The SGD equivalent is the payment amount multiplied by the currency rate.",
+     "target": ["SGD", "AMT"], "uses": [["AMT"], ["RATE"]]}
+  ]
+}
