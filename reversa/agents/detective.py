@@ -239,8 +239,6 @@ class Detective(Agent):
         if specs:
             ctx.write("ops_spec.md", specbuilder.render_ops_spec(specs))
             ctx.write("gaps_contradictions.md", specbuilder.render_gaps(specs))
-<<<<<<< HEAD
-=======
             ctx.write("process_flow.md", specbuilder.render_process(specs))
             import json as _json, os as _os
             rules_json = specbuilder.to_json(specs)
@@ -256,7 +254,6 @@ class Detective(Agent):
                     ctx.log(f"  detective: standards comparison: {cmp['summary']}")
                 except Exception as e:      # never fail the run because of the standards file
                     ctx.log(f"  detective: standards comparison skipped: {e}")
->>>>>>> 5f57dba (Reversa: hybrid backend, formatted Word export, analysis-mode docs)
         parts = [specbuilder.render_rules(specs)] if specs else ["# Domain rules, states and exceptions\n"]
         spec_units = {u for u, sps in getattr(self, "_specs", {}).items() if sps}
         for u in ctx.selected_units():

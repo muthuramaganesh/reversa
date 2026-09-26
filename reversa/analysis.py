@@ -156,16 +156,12 @@ def analyze_cobol(path: str, lines: list[str]) -> FileFacts:
                 ff.facts.append(Fact("dispatch", m.group(1), i, current_para))
             m = _WHEN.match(line)
             if m:
-<<<<<<< HEAD
-                ff.facts.append(Fact("case", m.group(1), i, current_para))
-=======
                 val = re.split(r"\s+(?:THEN\s+)?(?=(?:MOVE|COMPUTE|ADD|SUBTRACT|MULTIPLY|DIVIDE|PERFORM|"
                                r"DISPLAY|GO\s+TO|CONTINUE|CALL|SET)\b)", m.group(1), maxsplit=1, flags=re.I)[0]
                 ff.facts.append(Fact("case", val.strip().rstrip("."), i, current_para))
                 im = re.search(r"\bMOVE\s+(.+?)\s+TO\s+([A-Z0-9][A-Z0-9-]*)", m.group(1), re.I)
                 if im:
                     ff.facts.append(Fact("move", im.group(2).upper(), i, current_para, {"value": im.group(1).strip()}))
->>>>>>> 5f57dba (Reversa: hybrid backend, formatted Word export, analysis-mode docs)
             m = _MOVE.match(line)
             if m:
                 value, field = m.group(1).strip(), m.group(2).upper()

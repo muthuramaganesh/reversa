@@ -76,8 +76,6 @@ class Block:
     end_line: int = 0
 
 
-<<<<<<< HEAD
-=======
 _INLINE_VERB = re.compile(r"\s+(?:THEN\s+)?((?:MOVE|COMPUTE|ADD|SUBTRACT|MULTIPLY|DIVIDE|PERFORM|DISPLAY|"
                           r"GO\s+TO|CONTINUE|CALL|SET|STOP\s+RUN|GOBACK|INITIALIZE|STRING|WRITE|READ)\b.*)$", re.I)
 
@@ -90,7 +88,6 @@ def _split_inline(text: str) -> tuple[str, str | None]:
     return text[:m.start()].strip(), m.group(1).strip()
 
 
->>>>>>> 5f57dba (Reversa: hybrid backend, formatted Word export, analysis-mode docs)
 def _clean(line: str) -> str:
     # free-format and fixed-format tolerant: drop sequence area & comment lines
     if len(line) > 6 and line[:6].strip().isdigit():
@@ -206,12 +203,6 @@ def parse(path: str, lines: list[str]) -> Program:
             while i < len(clean) and re.match(r"^\s*(AND|OR)\b", clean[i], re.I):
                 cond += " " + clean[i].strip().rstrip(".")
                 i += 1
-<<<<<<< HEAD
-            blk = Block("if", ln, cond.strip().rstrip("."), para=cur.para)
-            sink().append(blk)
-            exec_lines.add(ln)
-            stack.append((blk, "then"))
-=======
             cond, inline = _split_inline(cond.strip().rstrip("."))
             cond = re.sub(r"\s+THEN\s*$", "", cond, flags=re.I)
             blk = Block("if", ln, cond, para=cur.para)
@@ -224,16 +215,12 @@ def parse(path: str, lines: list[str]) -> Program:
                     blk.then.append(st)
             if ends_sentence:
                 close_all(ln)
->>>>>>> 5f57dba (Reversa: hybrid backend, formatted Word export, analysis-mode docs)
             continue
         if _ELSE.match(s):
             for k in range(len(stack) - 1, -1, -1):
                 if stack[k][0].kind == "if":
                     stack[k] = (stack[k][0], "other")
                     del stack[k + 1:]
-<<<<<<< HEAD
-                    break
-=======
                     rest = re.sub(r"^\s*ELSE\b", "", s, flags=re.I).strip()
                     if rest:
                         st = _stmt(rest, ln)
@@ -242,7 +229,6 @@ def parse(path: str, lines: list[str]) -> Program:
                     break
             if ends_sentence:
                 close_all(ln)
->>>>>>> 5f57dba (Reversa: hybrid backend, formatted Word export, analysis-mode docs)
             continue
         if _END_IF.match(s):
             for k in range(len(stack) - 1, -1, -1):
@@ -264,9 +250,6 @@ def parse(path: str, lines: list[str]) -> Program:
         if m and stack:
             for k in range(len(stack) - 1, -1, -1):
                 if stack[k][0].kind == "eval":
-<<<<<<< HEAD
-                    stack[k][0].cases.append((m.group(1).strip().rstrip("."), ln, []))
-=======
                     val, inline = _split_inline(m.group(1).strip().rstrip("."))
                     body = []
                     if inline:
@@ -274,7 +257,6 @@ def parse(path: str, lines: list[str]) -> Program:
                         if st:
                             body.append(st)
                     stack[k][0].cases.append((val, ln, body))
->>>>>>> 5f57dba (Reversa: hybrid backend, formatted Word export, analysis-mode docs)
                     stack[k] = (stack[k][0], "case")
                     del stack[k + 1:]
                     break
@@ -474,8 +456,6 @@ def _actions_english(items: list, prog: Program) -> str:
     return parts[0] if len(parts) == 1 else ", then ".join(parts)
 
 
-<<<<<<< HEAD
-=======
 def _norm_op(op: str) -> str:
     op = " ".join(op.upper().split())
     return {"NOT =": "!=", "==": "="}.get(op, op)
@@ -559,7 +539,6 @@ def act_facts(items: list) -> list[dict]:
     return out
 
 
->>>>>>> 5f57dba (Reversa: hybrid backend, formatted Word export, analysis-mode docs)
 def _terminates(items: list) -> bool:
     return any(isinstance(it, Stmt) and it.kind in _TERMINATES for it in items)
 
@@ -645,10 +624,7 @@ class Rule:
     lines: tuple[int, int]
     technical: str
     note: str = ""
-<<<<<<< HEAD
-=======
     facts: dict = field(default_factory=dict)   # machine-readable form, for standards comparison
->>>>>>> 5f57dba (Reversa: hybrid backend, formatted Word export, analysis-mode docs)
 
 
 @dataclass
@@ -661,10 +637,7 @@ class Table:
     lines: tuple[int, int]
     technical: str
     example: str = ""
-<<<<<<< HEAD
-=======
     facts: dict = field(default_factory=dict)
->>>>>>> 5f57dba (Reversa: hybrid backend, formatted Word export, analysis-mode docs)
 
 
 @dataclass
@@ -790,15 +763,11 @@ def build(path: str, lines: list[str]) -> Spec:
             rid = nid("BR")
             end = max(_block_lines(it))
             spec.rules.append(Rule(rid, cat, plain, example_for_if(it, prog), conf,
-<<<<<<< HEAD
-                                   (it.line, end), f"IF {it.text}", note))
-=======
                                    (it.line, end), f"IF {it.text}", note,
                                    facts={"kind": "condition", "program": prog.name,
                                           "conditions": cond_facts(it.text, prog),
                                           "context": [cond_facts(c[1].text, prog) for c in ctx if c[0] == "if"],
                                           "actions": act_facts(it.then), "else_actions": act_facts(it.other)}))
->>>>>>> 5f57dba (Reversa: hybrid backend, formatted Word export, analysis-mode docs)
             spec.covered.update(_block_lines(it))
             if depth == 0:
                 step[0] += 1
@@ -822,10 +791,6 @@ def build(path: str, lines: list[str]) -> Spec:
                        "result keeps whatever value it had before.")
             kind = _classify(it, prog, spec)
             end = max(_block_lines(it))
-<<<<<<< HEAD
-            spec.tables.append(Table(tid, subject, kind, rows, default, (it.line, end),
-                                     f"EVALUATE {it.text}", example_for_table(ex_rows, subject)))
-=======
             if it.text.upper() == "TRUE":
                 subj_fields, _ = _flag_fields([w for w, _, _ in it.cases if w.upper() != "OTHER"], prog)
             else:
@@ -840,7 +805,6 @@ def build(path: str, lines: list[str]) -> Spec:
                       "fields": subj_fields, "rows": raw_rows, "has_default": has_other}
             spec.tables.append(Table(tid, subject, kind, rows, default, (it.line, end),
                                      f"EVALUATE {it.text}", example_for_table(ex_rows, subject), facts=tfacts))
->>>>>>> 5f57dba (Reversa: hybrid backend, formatted Word export, analysis-mode docs)
             # one BR rule per table as well, so the rules list is complete on its own
             rid = nid("BR")
             lead = f"When {pre}, the" if pre else "The"
@@ -848,11 +812,7 @@ def build(path: str, lines: list[str]) -> Spec:
             spec.rules.append(Rule(rid, "Decision", f"{lead} program decides by {subject} "
                                    f"(see table {tid}): {summary}.", example_for_table(ex_rows, subject),
                                    "confirmed", (it.line, end), f"EVALUATE {it.text}",
-<<<<<<< HEAD
-                                   "" if has_other else "No default (WHEN OTHER) branch."))
-=======
                                    "" if has_other else "No default (WHEN OTHER) branch.", facts=tfacts))
->>>>>>> 5f57dba (Reversa: hybrid backend, formatted Word export, analysis-mode docs)
             spec.covered.update(_block_lines(it))
             if depth == 0:
                 step[0] += 1
@@ -865,13 +825,9 @@ def build(path: str, lines: list[str]) -> Spec:
                 rid = nid("BR")
                 cat = "Calculation" if it.kind in ("compute", "arith") else "Processing step"
                 spec.rules.append(Rule(rid, cat, f"The program will always {text}.",
-<<<<<<< HEAD
-                                       "", "confirmed", (it.line, it.line), it.text))
-=======
                                        "", "confirmed", (it.line, it.line), it.text,
                                        facts={"kind": "statement", "program": prog.name,
                                               "actions": act_facts([it])}))
->>>>>>> 5f57dba (Reversa: hybrid backend, formatted Word export, analysis-mode docs)
             spec.covered.add(it.line)
 
     for p in prog.paras:
@@ -896,8 +852,6 @@ def build(path: str, lines: list[str]) -> Spec:
         spec.rules.append(Rule(nid("BR"), "Inferred intent", text, "", "inferred",
             (blk.line, msg.line), f"IF {blk.text} / DISPLAY '{msg.value}'",
             "Confirm with the business owner; see Gaps and contradictions."))
-<<<<<<< HEAD
-=======
     # order everything from the beginning of the program to the end; an inferred-intent
     # rule sits directly after the confirmed rule it interprets
     order = {"Inferred intent": 1}
@@ -909,7 +863,6 @@ def build(path: str, lines: list[str]) -> Spec:
         r.id = remap[r.id]
     spec.flow = [(no, re.sub(r"\bBR-\d+\b", lambda m: remap.get(m.group(0), m.group(0)), t), ln)
                  for no, t, ln in spec.flow]
->>>>>>> 5f57dba (Reversa: hybrid backend, formatted Word export, analysis-mode docs)
     _crosscheck(spec)
     return spec
 
@@ -1208,8 +1161,6 @@ def render_gaps(specs: list[Spec]) -> str:
     return "\n".join(out)
 
 
-<<<<<<< HEAD
-=======
 def render_process(specs: list[Spec]) -> str:
     """Business-readable process view: overview first, then steps, then the decisions."""
     out = ["# Process\n",
@@ -1238,7 +1189,6 @@ def render_process(specs: list[Spec]) -> str:
     return "\n".join(out)
 
 
->>>>>>> 5f57dba (Reversa: hybrid backend, formatted Word export, analysis-mode docs)
 def render_ops_spec(specs: list[Spec]) -> str:
     """Layered operational specification: generic → specific."""
     out = ["# Detailed operational specification\n",
@@ -1346,16 +1296,6 @@ def _table_output(t: Table, sp: Spec) -> str:
 # --------------------------------------------------------------------------
 # Optional AI rewriting pass (used only when an AI backend is configured)
 # --------------------------------------------------------------------------
-<<<<<<< HEAD
-REWRITE_PROMPT = ("Rewrite the rules as a single sentence a non-technical business analyst would "
-                  "understand. State the condition and the outcome in business terms (not variable "
-                  "names). Then give one worked numeric example. Do not use code syntax.")
-
-REWRITE_SYSTEM = (REWRITE_PROMPT + "\n\nYou will receive a JSON list of rules, each with an id, the "
-                  "code it came from, and a draft sentence. Keep every number, limit, rate, "
-                  "currency and message text exactly as given. Do not add facts that are not in the "
-                  "code. Reply with JSON only: {\"rules\": [{\"id\": \"BR-01\", \"rule\": \"...\", "
-=======
 REWRITE_PROMPT = ("Rewrite the rules , processes , gaps and contradictions ops specs , full "
                   "document  as a single sentence a non-technical business analyst would understand. "
                   "State the condition and the outcome for all the 5 ( rules, ops specs, processes, "
@@ -1372,7 +1312,6 @@ REWRITE_SYSTEM = (REWRITE_PROMPT + "\n\nYou will receive JSON with the program's
                   "with JSON only: {\"processes\": [{\"id\": \"P-1\", \"step\": \"...\"}], "
                   "\"rules\": [{\"id\": \"BR-01\", \"rule\": \"...\", \"example\": \"...\"}], "
                   "\"findings\": [{\"id\": \"GC-01\", \"finding\": \"...\", \"question\": \"...\", "
->>>>>>> 5f57dba (Reversa: hybrid backend, formatted Word export, analysis-mode docs)
                   "\"example\": \"...\"}]}")
 
 
@@ -1408,10 +1347,6 @@ def rewrite_rules(spec: Spec, call) -> int:
         return 0
     payload = [{"id": r.id, "type": r.category, "code": r.technical,
                 "draft": r.plain, "draft_example": r.example} for r in rules]
-<<<<<<< HEAD
-    try:
-        reply = call(REWRITE_SYSTEM, json.dumps({"program": spec.program.name, "rules": payload}))
-=======
     procs = [{"id": f"P-{no}", "draft": text,
               "code": spec.program.lines[ln - 1].strip() if 0 < ln <= len(spec.program.lines) else ""}
              for no, text, ln in spec.flow]
@@ -1421,14 +1356,10 @@ def rewrite_rules(spec: Spec, call) -> int:
         reply = call(REWRITE_SYSTEM, json.dumps({"program": spec.program.name,
                                                  "processes": procs, "rules": payload,
                                                  "findings": finds}))
->>>>>>> 5f57dba (Reversa: hybrid backend, formatted Word export, analysis-mode docs)
         data = parse_json(reply)
     except Exception:
         return 0
     by_id = {x.get("id"): x for x in (data or {}).get("rules", []) if isinstance(x, dict)}
-<<<<<<< HEAD
-    done = 0
-=======
     p_by_id = {x.get("id"): x for x in (data or {}).get("processes", []) if isinstance(x, dict)}
     done = 0
     new_flow = []
@@ -1455,7 +1386,6 @@ def rewrite_rules(spec: Spec, call) -> int:
             f.text = text
             f.question = (new.get("question") or f.question).strip()
             done += 1
->>>>>>> 5f57dba (Reversa: hybrid backend, formatted Word export, analysis-mode docs)
     for r in rules:
         new = by_id.get(r.id)
         if not new or not new.get("rule"):
@@ -1472,8 +1402,6 @@ def rewrite_rules(spec: Spec, call) -> int:
 # --------------------------------------------------------------------------
 # Claims for the Reversa registry (so scoring/reviewer keep working)
 # --------------------------------------------------------------------------
-<<<<<<< HEAD
-=======
 def to_json(specs: list[Spec]) -> dict[str, Any]:
     """Full machine-readable output: every rule, table, gap and coverage figure."""
     progs = []
@@ -1498,7 +1426,6 @@ def to_json(specs: list[Spec]) -> dict[str, Any]:
     return {"generator": "reversa-specbuilder", "programs": progs}
 
 
->>>>>>> 5f57dba (Reversa: hybrid backend, formatted Word export, analysis-mode docs)
 def to_claims(sp: Spec) -> list[dict[str, Any]]:
     p = sp.program
     claims = []
