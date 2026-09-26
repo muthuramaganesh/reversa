@@ -176,21 +176,30 @@ DEFAULT_STANDARDS = Path(__file__).parent / "standards" / "payments_fee_standard
 XLSX: dict[str, Path] = {}
 
 
+def _file_section(sdd: Path, tab_title: str, candidates: list[str]) -> Optional[dict]:
+    """First existing artifact among `candidates`, rendered as one tab."""
+    for name in candidates:
+        hits = sorted(sdd.rglob(name))
+        if hits:
+            body = hits[0].read_text(encoding="utf-8", errors="replace")
+            return {"title": tab_title, "file": hits[0].relative_to(sdd).as_posix(),
+                    "html": pypandoc.convert_text(body, "html", format="gfm")}
+    return None
+
+
 def _panel_sections(sdd: Path) -> list[dict]:
     """Render the business-facing docs individually for the slide-over panel."""
-    sections = []
-    for tab_title, candidates in PANEL_FILES:
-        for name in candidates:
-            hits = sorted(sdd.rglob(name))
-            if hits:
-                body = hits[0].read_text(encoding="utf-8", errors="replace")
-                sections.append({
-                    "title": tab_title,
-                    "file": hits[0].relative_to(sdd).as_posix(),
-                    "html": pypandoc.convert_text(body, "html", format="gfm"),
-                })
-                break
-    return sections
+    return [s for s in (_file_section(sdd, t, c) for t, c in PANEL_FILES) if s]
+
+
+def _business_context_section(sdd: Path, md: str, title: str, backend: str) -> Optional[dict]:
+    """The Business Context tab: the AI-written overview when an AI model is available for
+    this backend, otherwise the extracted business-context.md (so heuristic runs have it too)."""
+    overview = _llm_business_context(md, title, backend)
+    if overview:
+        return {"title": "Business Context", "file": "synthesized from the extracted specification",
+                "html": pypandoc.convert_text(overview, "html", format="gfm")}
+    return _file_section(sdd, "Business Context", ["business-context.md", "business_context.md"])
 
 
 BUSINESS_PROMPT = """You are writing for bank business stakeholders (product owners, operations \
@@ -419,13 +428,10 @@ async def analyze_preview(
         XLSX[job] = keep
     n_files = len(list(sdd.rglob("*.md")))
     sections = _panel_sections(sdd)
-    overview = _llm_business_context(md, title, backend)
-    if overview:
-        # Synthesized plain-English overview leads; rules, gaps and the layered
-        # ops spec follow as their own tabs.
-        sections = [{"title": "Business Context",
-                     "file": "synthesized from the extracted specification",
-                     "html": pypandoc.convert_text(overview, "html", format="gfm")}] + sections
+    # Business Context leads; rules, gaps and the layered ops spec follow as their own tabs.
+    business = _business_context_section(sdd, md, title, backend)
+    if business:
+        sections = [business] + sections
     payload = {"id": job, "files": n_files, "html": _to_html(md), "sections": sections,
                "docx_warning": docx_warning,
                "xlsx": job in XLSX}
